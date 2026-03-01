@@ -5,6 +5,7 @@ import json
 from datetime import datetime
 from getpass import getpass
 from pathlib import Path
+from datetime import timezone
 
 from .json.scanner import scan_json_files
 from .json.validator import validate_json_file
@@ -40,9 +41,9 @@ def cmd_template(root: Path) -> int:
     return 0
 
 
-def cmd_fix(root: Path, apply: bool, backup: bool) -> int:
-    files = scan_json_files(root)
-    result = fix_files(root, files, apply=apply, backup=backup)
+def cmd_fix(root: Path, apply: bool, backup: bool, use_ai: bool = False, selected_files: list[Path] | None = None) -> int:
+    files = selected_files if selected_files is not None else scan_json_files(root)
+    result = fix_files(root, files, apply=apply, backup=backup, use_ai=use_ai)
     stem = f"fix-{datetime.utcnow().strftime('%Y%m%d-%H%M%S')}"
     txt, js = write_reports(root, result, stem)
     print(f"fix complete, applied={apply}, backup_id={result.get('backup_id')}")
@@ -166,6 +167,43 @@ def _run_and_report(label: str, fn, t: dict[str, str]) -> None:
     print(f"✓ {t['done']}: {status}")
 
 
+def _select_files_with_tui(files: list[Path], lang: str) -> list[Path]:
+    is_zh = lang == "zh"
+    if not files:
+        print("未找到 JSON 文件" if is_zh else "No JSON files found")
+        return []
+
+    files_with_mtime = [(fp, fp.stat().st_mtime) for fp in files]
+    files_with_mtime.sort(key=lambda x: x[1], reverse=True)
+    latest_mtime = files_with_mtime[0][1] if files_with_mtime else None
+
+    print("\n" + ("找到以下 JSON 文件:" if is_zh else "Found JSON files:"))
+    print("-" * 60)
+    for idx, (fp, mtime) in enumerate(files_with_mtime):
+        mtime_str = datetime.fromtimestamp(mtime).strftime("%Y-%m-%d %H:%M:%S")
+        latest_marker = " ★ (最新)" if is_zh else " ★ (latest)"
+        marker = latest_marker if mtime == latest_mtime else ""
+        print(f" {idx + 1}) {fp.name}{marker}")
+        print(f"    {fp}")
+        print(f"    {mtime_str}")
+    print("-" * 60)
+
+    prompt = "选择文件编号 (逗号分隔，如 1,3,5；a=全部；q=取消): " if is_zh else "Select file numbers (comma-separated, e.g. 1,3,5; a=all; q=cancel): "
+    sel = input(prompt).strip().lower()
+
+    if sel == "q" or sel == "":
+        return []
+    if sel == "a":
+        return files
+
+    try:
+        indices = [int(x.strip()) - 1 for x in sel.split(",") if x.strip().isdigit()]
+        return [files_with_mtime[i][0] for i in indices if 0 <= i < len(files_with_mtime)]
+    except (ValueError, IndexError):
+        print("无效选择" if is_zh else "Invalid selection")
+        return []
+
+
 def cmd_tui(root: Path) -> int:
     lang_pick = input("Language / 语言 [en/zh] (default: zh): ").strip().lower() or "zh"
     lang = "zh" if lang_pick.startswith("z") else "en"
@@ -175,7 +213,7 @@ def cmd_tui(root: Path) -> int:
         "ok": "成功" if lang == "zh" else "OK",
         "failed": "失败" if lang == "zh" else "FAILED",
         "done": "完成" if lang == "zh" else "done",
-        "choose": "请选择 [0-8]: " if lang == "zh" else "Select [0-8]: ",
+        "choose": "请选择 [0-9]: " if lang == "zh" else "Select [0-9]: ",
         "bye": "已退出" if lang == "zh" else "bye",
         "invalid": "无效选项" if lang == "zh" else "invalid option",
         "continue": "按回车继续..." if lang == "zh" else "Press Enter to continue...",
@@ -196,9 +234,10 @@ def cmd_tui(root: Path) -> int:
         print(" 3) 修复 JSON（应用+备份）" if lang == "zh" else " 3) fix JSON (apply + backup)")
         print(" 4) 回滚最近备份" if lang == "zh" else " 4) rollback latest backup")
         print(" 5) 校验 API 环境变量" if lang == "zh" else " 5) API env validate")
-        print(" 6) API 连通性测试" if lang == "zh" else " 6) API connectivity test")
+        print(" 6) AI 修复模式 (需要API)" if lang == "zh" else " 6) AI repair mode (requires API)")
         print(" 7) 全量检查（pytest+scan+fix+rollback+api）" if lang == "zh" else " 7) full check (pytest + scan + fix + rollback + api)")
         print(" 8) 交互式写入 .env" if lang == "zh" else " 8) write .env (interactive wizard)")
+        print(" 9) API 连通性测试" if lang == "zh" else " 9) API connectivity test")
         print(" 0) 退出" if lang == "zh" else " 0) quit")
 
         choice = input("\n" + t["choose"]).strip()
@@ -211,13 +250,23 @@ def cmd_tui(root: Path) -> int:
         elif choice == "2":
             _run_and_report("template", lambda: cmd_template(scan_root), t)
         elif choice == "3":
-            _run_and_report("fix --apply --backup", lambda: cmd_fix(scan_root, apply=True, backup=True), t)
+            all_files = scan_json_files(scan_root)
+            selected = _select_files_with_tui(all_files, lang)
+            if selected:
+                _run_and_report("fix --apply --backup", lambda: cmd_fix(scan_root, apply=True, backup=True, selected_files=selected), t)
+            else:
+                print("取消修复" if lang == "zh" else "Fix cancelled")
         elif choice == "4":
             _run_and_report("rollback --latest", lambda: cmd_rollback(scan_root, latest=True), t)
         elif choice == "5":
             _run_and_report("api validate", lambda: cmd_api_validate(root), t)
         elif choice == "6":
-            _run_and_report("api test", lambda: cmd_api_test(root), t)
+            all_files = scan_json_files(scan_root)
+            selected = _select_files_with_tui(all_files, lang)
+            if selected:
+                _run_and_report("fix --apply --backup --ai", lambda: cmd_fix(scan_root, apply=True, backup=True, use_ai=True, selected_files=selected), t)
+            else:
+                print("取消 AI 修复" if lang == "zh" else "AI fix cancelled")
         elif choice == "7":
             from subprocess import run
             import sys
@@ -242,6 +291,8 @@ def cmd_tui(root: Path) -> int:
             _run_and_report("full check", full_check, t)
         elif choice == "8":
             _run_and_report("api wizard", lambda: cmd_api_wizard(root, lang=lang), t)
+        elif choice == "9":
+            _run_and_report("api test", lambda: cmd_api_test(root), t)
         else:
             print(t["invalid"])
 
@@ -259,6 +310,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_fix = sub.add_parser("fix")
     p_fix.add_argument("--apply", action="store_true")
     p_fix.add_argument("--backup", action="store_true")
+    p_fix.add_argument("--ai", action="store_true", help="Enable AI repair mode (loops until parse passes or max rounds)")
 
     p_rb = sub.add_parser("rollback")
     p_rb.add_argument("--latest", action="store_true")
@@ -285,7 +337,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd == "tui":
         return cmd_tui(root)
     if args.cmd == "fix":
-        return cmd_fix(root, apply=args.apply, backup=args.backup)
+        return cmd_fix(root, apply=args.apply, backup=args.backup, use_ai=args.ai)
     if args.cmd == "rollback":
         return cmd_rollback(root, latest=args.latest)
     if args.cmd == "api":
