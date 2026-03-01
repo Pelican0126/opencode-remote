@@ -1,0 +1,13 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "provider": {
+    "zhipuai": {
+      "api": "https://open.bigmodel.cn/api/coding/paas/v4"
+    },
+    "moonshot": {
+      "options": {
+        "baseURL": "https://api.moonshot.cn/v1"
+      }
+    }
+  }
+}
