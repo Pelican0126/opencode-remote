@@ -181,8 +181,16 @@ def cmd_tui(root: Path) -> int:
         "continue": "按回车继续..." if lang == "zh" else "Press Enter to continue...",
     }
 
+    scan_input_tip = "请输入 JSON 扫描路径（回车=当前目录）: " if lang == "zh" else "Enter JSON scan path (Enter = current directory): "
+    scan_raw = input(scan_input_tip).strip()
+    scan_root = (Path(scan_raw).expanduser() if scan_raw else root).resolve()
+    if not scan_root.exists() or not scan_root.is_dir():
+        print((f"路径无效，回退到当前目录: {root}") if lang == "zh" else (f"Invalid path, fallback to current directory: {root}"))
+        scan_root = root
+
     while True:
         _print_tui_header(root, t)
+        print((f" JSON扫描路径: {scan_root}") if lang == "zh" else (f" JSON scan path: {scan_root}"))
         print(" 1) 扫描 JSON 文件" if lang == "zh" else " 1) scan JSON files")
         print(" 2) 生成模板" if lang == "zh" else " 2) generate template")
         print(" 3) 修复 JSON（应用+备份）" if lang == "zh" else " 3) fix JSON (apply + backup)")
@@ -199,13 +207,13 @@ def cmd_tui(root: Path) -> int:
             print(t["bye"])
             return 0
         if choice == "1":
-            _run_and_report("scan", lambda: cmd_scan(root), t)
+            _run_and_report("scan", lambda: cmd_scan(scan_root), t)
         elif choice == "2":
-            _run_and_report("template", lambda: cmd_template(root), t)
+            _run_and_report("template", lambda: cmd_template(scan_root), t)
         elif choice == "3":
-            _run_and_report("fix --apply --backup", lambda: cmd_fix(root, apply=True, backup=True), t)
+            _run_and_report("fix --apply --backup", lambda: cmd_fix(scan_root, apply=True, backup=True), t)
         elif choice == "4":
-            _run_and_report("rollback --latest", lambda: cmd_rollback(root, latest=True), t)
+            _run_and_report("rollback --latest", lambda: cmd_rollback(scan_root, latest=True), t)
         elif choice == "5":
             _run_and_report("api validate", lambda: cmd_api_validate(root), t)
         elif choice == "6":
@@ -216,17 +224,17 @@ def cmd_tui(root: Path) -> int:
 
             def full_check() -> int:
                 steps = [
-                    [sys.executable, "-m", "pytest", "-q"],
-                    [sys.executable, "-m", "kit", "scan"],
-                    [sys.executable, "-m", "kit", "template"],
-                    [sys.executable, "-m", "kit", "fix", "--apply", "--backup"],
-                    [sys.executable, "-m", "kit", "rollback", "--latest"],
-                    [sys.executable, "-m", "kit", "api", "validate"],
-                    [sys.executable, "-m", "kit", "api", "test"],
+                    (root, [sys.executable, "-m", "pytest", "-q"]),
+                    (scan_root, [sys.executable, "-m", "kit", "scan"]),
+                    (scan_root, [sys.executable, "-m", "kit", "template"]),
+                    (scan_root, [sys.executable, "-m", "kit", "fix", "--apply", "--backup"]),
+                    (scan_root, [sys.executable, "-m", "kit", "rollback", "--latest"]),
+                    (root, [sys.executable, "-m", "kit", "api", "validate"]),
+                    (root, [sys.executable, "-m", "kit", "api", "test"]),
                 ]
-                for step in steps:
-                    print("$", " ".join(step))
-                    rc = run(step, cwd=root).returncode
+                for cwd, step in steps:
+                    print("$", " ".join(step), f"(cwd={cwd})")
+                    rc = run(step, cwd=cwd).returncode
                     if rc != 0:
                         return rc
                 return 0

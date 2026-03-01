@@ -30,7 +30,19 @@ pip install -r requirements.txt
 python -m kit tui
 ```
 
-启动后会先让你选择语言（中文/英文），然后出现菜单。
+启动后会先让你选择语言（中文/英文），然后输入**JSON 扫描路径**，最后出现菜单。
+
+### 扫描路径应该怎么填？
+
+- 填“**包含你 JSON 文件的目录**”即可，不要填单个 JSON 文件。
+- 可填绝对路径：
+  - Linux/macOS: `/home/ubuntu/myapp/config`
+  - Windows: `C:\\Users\\you\\project\\config`
+- 也可填相对路径（相对于你启动 `python -m kit tui` 时所在目录）：
+  - `./config`
+  - `../service-a/config`
+- 直接回车：默认当前目录（项目根目录）。
+- 如果路径不存在/不是目录，程序会自动回退到当前目录并提示你。
 
 ## 功能概览
 
