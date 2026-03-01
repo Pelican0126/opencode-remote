@@ -77,17 +77,18 @@ def _prompt(default: str, label: str, *, secret: bool = False) -> str:
     return default if val == "" else val
 
 
-def cmd_api_wizard(root: Path) -> int:
+def cmd_api_wizard(root: Path, lang: str = "en") -> int:
     env_file = root / ".env"
     current = ApiEnv.load(root)
 
-    print("interactive .env writer")
-    print(f"target: {env_file}")
-    print("(press Enter to keep current value)")
+    is_zh = lang == "zh"
+    print("交互式 .env 写入向导" if is_zh else "interactive .env writer")
+    print((f"目标文件: {env_file}") if is_zh else (f"target: {env_file}"))
+    print("（直接回车可保留当前值）" if is_zh else "(press Enter to keep current value)")
 
     region = _prompt(current.region or "intl", "REGION (cn/intl)")
     if region not in {"cn", "intl"}:
-        print("invalid REGION, fallback to intl")
+        print("REGION 非法，自动回退到 intl" if is_zh else "invalid REGION, fallback to intl")
         region = "intl"
 
     glm_api_key = _prompt(current.glm_api_key, "GLM_API_KEY", secret=True)
@@ -151,50 +152,64 @@ def cmd_api_test(root: Path) -> int:
     return 1 if has_err else 0
 
 
-def _print_tui_header(root: Path) -> None:
+def _print_tui_header(root: Path, t: dict[str, str]) -> None:
     print("\n" + "=" * 56)
-    print(" openclaw-json-repair-kit | Interactive TUI")
-    print(f" cwd: {root}")
+    print(t["title"])
+    print(f" {t['cwd']}: {root}")
     print("=" * 56)
 
 
-def _run_and_report(label: str, fn) -> None:
+def _run_and_report(label: str, fn, t: dict[str, str]) -> None:
     print(f"\n→ {label}")
     code = fn()
-    status = "OK" if code == 0 else f"FAILED (exit={code})"
-    print(f"✓ done: {status}")
+    status = t["ok"] if code == 0 else f"{t['failed']} (exit={code})"
+    print(f"✓ {t['done']}: {status}")
 
 
 def cmd_tui(root: Path) -> int:
-    while True:
-        _print_tui_header(root)
-        print(" 1) scan JSON files")
-        print(" 2) generate template")
-        print(" 3) fix JSON (apply + backup)")
-        print(" 4) rollback latest backup")
-        print(" 5) API env validate")
-        print(" 6) API connectivity test")
-        print(" 7) full check (pytest + scan + fix + rollback + api)")
-        print(" 8) write .env (interactive wizard)")
-        print(" 0) quit")
+    lang_pick = input("Language / 语言 [en/zh] (default: zh): ").strip().lower() or "zh"
+    lang = "zh" if lang_pick.startswith("z") else "en"
+    t = {
+        "title": " openclaw-json-repair-kit | 交互式终端" if lang == "zh" else " openclaw-json-repair-kit | Interactive TUI",
+        "cwd": "工作目录" if lang == "zh" else "cwd",
+        "ok": "成功" if lang == "zh" else "OK",
+        "failed": "失败" if lang == "zh" else "FAILED",
+        "done": "完成" if lang == "zh" else "done",
+        "choose": "请选择 [0-8]: " if lang == "zh" else "Select [0-8]: ",
+        "bye": "已退出" if lang == "zh" else "bye",
+        "invalid": "无效选项" if lang == "zh" else "invalid option",
+        "continue": "按回车继续..." if lang == "zh" else "Press Enter to continue...",
+    }
 
-        choice = input("\nSelect [0-8]: ").strip()
+    while True:
+        _print_tui_header(root, t)
+        print(" 1) 扫描 JSON 文件" if lang == "zh" else " 1) scan JSON files")
+        print(" 2) 生成模板" if lang == "zh" else " 2) generate template")
+        print(" 3) 修复 JSON（应用+备份）" if lang == "zh" else " 3) fix JSON (apply + backup)")
+        print(" 4) 回滚最近备份" if lang == "zh" else " 4) rollback latest backup")
+        print(" 5) 校验 API 环境变量" if lang == "zh" else " 5) API env validate")
+        print(" 6) API 连通性测试" if lang == "zh" else " 6) API connectivity test")
+        print(" 7) 全量检查（pytest+scan+fix+rollback+api）" if lang == "zh" else " 7) full check (pytest + scan + fix + rollback + api)")
+        print(" 8) 交互式写入 .env" if lang == "zh" else " 8) write .env (interactive wizard)")
+        print(" 0) 退出" if lang == "zh" else " 0) quit")
+
+        choice = input("\n" + t["choose"]).strip()
 
         if choice == "0":
-            print("bye")
+            print(t["bye"])
             return 0
         if choice == "1":
-            _run_and_report("scan", lambda: cmd_scan(root))
+            _run_and_report("scan", lambda: cmd_scan(root), t)
         elif choice == "2":
-            _run_and_report("template", lambda: cmd_template(root))
+            _run_and_report("template", lambda: cmd_template(root), t)
         elif choice == "3":
-            _run_and_report("fix --apply --backup", lambda: cmd_fix(root, apply=True, backup=True))
+            _run_and_report("fix --apply --backup", lambda: cmd_fix(root, apply=True, backup=True), t)
         elif choice == "4":
-            _run_and_report("rollback --latest", lambda: cmd_rollback(root, latest=True))
+            _run_and_report("rollback --latest", lambda: cmd_rollback(root, latest=True), t)
         elif choice == "5":
-            _run_and_report("api validate", lambda: cmd_api_validate(root))
+            _run_and_report("api validate", lambda: cmd_api_validate(root), t)
         elif choice == "6":
-            _run_and_report("api test", lambda: cmd_api_test(root))
+            _run_and_report("api test", lambda: cmd_api_test(root), t)
         elif choice == "7":
             from subprocess import run
             import sys
@@ -216,13 +231,13 @@ def cmd_tui(root: Path) -> int:
                         return rc
                 return 0
 
-            _run_and_report("full check", full_check)
+            _run_and_report("full check", full_check, t)
         elif choice == "8":
-            _run_and_report("api wizard", lambda: cmd_api_wizard(root))
+            _run_and_report("api wizard", lambda: cmd_api_wizard(root, lang=lang), t)
         else:
-            print("invalid option")
+            print(t["invalid"])
 
-        input("\nPress Enter to continue...")
+        input("\n" + t["continue"])
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -269,7 +284,9 @@ def main(argv: list[str] | None = None) -> int:
         if args.api_cmd == "init":
             return cmd_api_init(root)
         if args.api_cmd == "wizard":
-            return cmd_api_wizard(root)
+            lang_pick = input("Language / 语言 [en/zh] (default: zh): ").strip().lower() or "zh"
+            lang = "zh" if lang_pick.startswith("z") else "en"
+            return cmd_api_wizard(root, lang=lang)
         if args.api_cmd == "validate":
             return cmd_api_validate(root)
         if args.api_cmd == "test":
