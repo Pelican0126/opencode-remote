@@ -96,3 +96,26 @@ python -m kit api test
 - `fix`：确定性可逆修复（BOM、注释剥离、尾随逗号、可证明安全的单引号替换）
 - `backup/rollback`：修复前备份到 `.openclaw-backups/<backup_id>/`，带 `manifest.json`，失败自动回滚
 - `report`：生成 text + json 两种报告，位于 `reports/`
+
+
+## 快速上手（从 GitHub 克隆）
+
+```bash
+git clone https://github.com/Pelican0126/openclaw-json-repair-kit.git
+cd openclaw-json-repair-kit
+python3 -m venv .venv
+source .venv/bin/activate   # Windows: .\.venv\Scripts\Activate.ps1
+pip install -U pip
+pip install -r requirements.txt
+cp .env.example .env
+```
+
+然后执行：
+
+```bash
+python -m kit scan
+python -m kit fix --apply --backup
+python -m kit rollback --latest
+python -m kit api validate
+python -m kit api test
+```
