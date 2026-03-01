@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 from datetime import datetime
+from getpass import getpass
 from pathlib import Path
 
 from .json.scanner import scan_json_files
@@ -68,6 +69,69 @@ def cmd_api_init(root: Path) -> int:
     return 0
 
 
+def _prompt(default: str, label: str, *, secret: bool = False) -> str:
+    shown = "***" if (secret and default) else default
+    tip = f" [{shown}]" if shown else ""
+    raw = getpass(f"{label}{tip}: ") if secret else input(f"{label}{tip}: ")
+    val = raw.strip()
+    return default if val == "" else val
+
+
+def cmd_api_wizard(root: Path) -> int:
+    env_file = root / ".env"
+    current = ApiEnv.load(root)
+
+    print("interactive .env writer")
+    print(f"target: {env_file}")
+    print("(press Enter to keep current value)")
+
+    region = _prompt(current.region or "intl", "REGION (cn/intl)")
+    if region not in {"cn", "intl"}:
+        print("invalid REGION, fallback to intl")
+        region = "intl"
+
+    glm_api_key = _prompt(current.glm_api_key, "GLM_API_KEY", secret=True)
+    glm_base_url_cn = _prompt(current.glm_base_url_cn or "https://open.bigmodel.cn/api/coding/paas/v4", "GLM_BASE_URL_CN")
+    glm_base_url_intl = _prompt(current.glm_base_url_intl or "https://api.z.ai/api/coding/paas/v4", "GLM_BASE_URL_INTL")
+    glm_model = _prompt(current.glm_model or "GLM-5", "GLM_MODEL")
+
+    kimi_api_key = _prompt(current.kimi_api_key, "KIMI_API_KEY", secret=True)
+    kimi_base_url_cn = _prompt(current.kimi_base_url_cn or "https://api.moonshot.cn/v1", "KIMI_BASE_URL_CN")
+    kimi_base_url_intl = _prompt(current.kimi_base_url_intl or "https://api.moonshot.ai/v1", "KIMI_BASE_URL_INTL")
+    kimi_model = _prompt(current.kimi_model or "moonshot-v1-8k", "KIMI_MODEL")
+
+    endpoint_path = _prompt(current.endpoint_path or "/chat/completions", "API_ENDPOINT_PATH")
+    if not endpoint_path.startswith("/"):
+        endpoint_path = "/" + endpoint_path
+
+    content = "\n".join(
+        [
+            "# region: cn/intl",
+            f"REGION={region}",
+            "",
+            "# GLM (Z.AI / BigModel Coding Plan)",
+            f"GLM_API_KEY={glm_api_key}",
+            f"GLM_BASE_URL_CN={glm_base_url_cn}",
+            f"GLM_BASE_URL_INTL={glm_base_url_intl}",
+            f"GLM_MODEL={glm_model}",
+            "",
+            "# Kimi (Moonshot)",
+            f"KIMI_API_KEY={kimi_api_key}",
+            f"KIMI_BASE_URL_CN={kimi_base_url_cn}",
+            f"KIMI_BASE_URL_INTL={kimi_base_url_intl}",
+            f"KIMI_MODEL={kimi_model}",
+            "",
+            "# Optional endpoint path (OpenAI-compatible default)",
+            f"API_ENDPOINT_PATH={endpoint_path}",
+            "",
+        ]
+    )
+
+    env_file.write_text(content, encoding="utf-8")
+    print(f"written: {env_file}")
+    return 0
+
+
 def cmd_api_validate(root: Path) -> int:
     env = ApiEnv.load(root)
     ok, issues = validate_env(env)
@@ -111,9 +175,10 @@ def cmd_tui(root: Path) -> int:
         print(" 5) API env validate")
         print(" 6) API connectivity test")
         print(" 7) full check (pytest + scan + fix + rollback + api)")
+        print(" 8) write .env (interactive wizard)")
         print(" 0) quit")
 
-        choice = input("\nSelect [0-7]: ").strip()
+        choice = input("\nSelect [0-8]: ").strip()
 
         if choice == "0":
             print("bye")
@@ -152,6 +217,8 @@ def cmd_tui(root: Path) -> int:
                 return 0
 
             _run_and_report("full check", full_check)
+        elif choice == "8":
+            _run_and_report("api wizard", lambda: cmd_api_wizard(root))
         else:
             print("invalid option")
 
@@ -176,6 +243,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_api = sub.add_parser("api")
     api_sub = p_api.add_subparsers(dest="api_cmd", required=True)
     api_sub.add_parser("init")
+    api_sub.add_parser("wizard")
     api_sub.add_parser("validate")
     api_sub.add_parser("test")
 
@@ -200,6 +268,8 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd == "api":
         if args.api_cmd == "init":
             return cmd_api_init(root)
+        if args.api_cmd == "wizard":
+            return cmd_api_wizard(root)
         if args.api_cmd == "validate":
             return cmd_api_validate(root)
         if args.api_cmd == "test":
