@@ -87,12 +87,84 @@ def cmd_api_test(root: Path) -> int:
     return 1 if has_err else 0
 
 
+def _print_tui_header(root: Path) -> None:
+    print("\n" + "=" * 56)
+    print(" openclaw-json-repair-kit | Interactive TUI")
+    print(f" cwd: {root}")
+    print("=" * 56)
+
+
+def _run_and_report(label: str, fn) -> None:
+    print(f"\n→ {label}")
+    code = fn()
+    status = "OK" if code == 0 else f"FAILED (exit={code})"
+    print(f"✓ done: {status}")
+
+
+def cmd_tui(root: Path) -> int:
+    while True:
+        _print_tui_header(root)
+        print(" 1) scan JSON files")
+        print(" 2) generate template")
+        print(" 3) fix JSON (apply + backup)")
+        print(" 4) rollback latest backup")
+        print(" 5) API env validate")
+        print(" 6) API connectivity test")
+        print(" 7) full check (pytest + scan + fix + rollback + api)")
+        print(" 0) quit")
+
+        choice = input("\nSelect [0-7]: ").strip()
+
+        if choice == "0":
+            print("bye")
+            return 0
+        if choice == "1":
+            _run_and_report("scan", lambda: cmd_scan(root))
+        elif choice == "2":
+            _run_and_report("template", lambda: cmd_template(root))
+        elif choice == "3":
+            _run_and_report("fix --apply --backup", lambda: cmd_fix(root, apply=True, backup=True))
+        elif choice == "4":
+            _run_and_report("rollback --latest", lambda: cmd_rollback(root, latest=True))
+        elif choice == "5":
+            _run_and_report("api validate", lambda: cmd_api_validate(root))
+        elif choice == "6":
+            _run_and_report("api test", lambda: cmd_api_test(root))
+        elif choice == "7":
+            from subprocess import run
+            import sys
+
+            def full_check() -> int:
+                steps = [
+                    [sys.executable, "-m", "pytest", "-q"],
+                    [sys.executable, "-m", "kit", "scan"],
+                    [sys.executable, "-m", "kit", "template"],
+                    [sys.executable, "-m", "kit", "fix", "--apply", "--backup"],
+                    [sys.executable, "-m", "kit", "rollback", "--latest"],
+                    [sys.executable, "-m", "kit", "api", "validate"],
+                    [sys.executable, "-m", "kit", "api", "test"],
+                ]
+                for step in steps:
+                    print("$", " ".join(step))
+                    rc = run(step, cwd=root).returncode
+                    if rc != 0:
+                        return rc
+                return 0
+
+            _run_and_report("full check", full_check)
+        else:
+            print("invalid option")
+
+        input("\nPress Enter to continue...")
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="kit")
     sub = p.add_subparsers(dest="cmd", required=True)
 
     sub.add_parser("scan")
     sub.add_parser("template")
+    sub.add_parser("tui")
 
     p_fix = sub.add_parser("fix")
     p_fix.add_argument("--apply", action="store_true")
@@ -119,6 +191,8 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_scan(root)
     if args.cmd == "template":
         return cmd_template(root)
+    if args.cmd == "tui":
+        return cmd_tui(root)
     if args.cmd == "fix":
         return cmd_fix(root, apply=args.apply, backup=args.backup)
     if args.cmd == "rollback":
