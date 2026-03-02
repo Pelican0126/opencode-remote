@@ -1,7 +1,36 @@
-.venv/
+# Python
 __pycache__/
+*.py[cod]
+*.pyo
+*.pyd
 .pytest_cache/
-.openclaw-backups/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Secrets and credentials
 .env
-*.pyc
+.env.*
+!.env.example
+*.key
+*.pem
+*.p12
+*.pfx
+*.crt
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+
+# Runtime outputs
+logs/
+*.log
+reports/
+.openclaw-backups/
+
+# OS / editor files
 .DS_Store
+Thumbs.db

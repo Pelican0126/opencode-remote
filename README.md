@@ -1,272 +1,120 @@
 # openclaw-json-repair-kit
 
-**Language / 语言：** [简体中文](#简体中文) | [English](#english)
+一句话：这是一个给新手准备的 JSON 诊断与修复工具，支持扫描、修复、备份回滚，以及可选的 AI 修复流程。
 
----
+## 特性
 
-## 简体中文
+- 自动扫描目录中的 JSON 问题并输出报告
+- 支持修复并在修改前自动备份
+- 支持一键回滚最近一次备份
+- 提供交互式 TUI，新手可按菜单操作
+- 提供 `.env.example` 模板与 API 连通性检查
+- 默认不包含任何真实 API key/token
 
-这是一个给"小白"也能用的 JSON 修复工具：
-- ✅ 自动扫描 JSON 问题
-- ✅ 自动修复并自动备份  
-- ✅ 一键回滚
-- ✅ AI 智能修复模式（循环尝试直到成功）
-- ✅ 交互式填写 `.env`
-- ✅ API 连通性检测
+## 快速开始（3 分钟）
 
-> ✅ 已移除任何私有的 API Key / 私有 Base URL。仓库只保留安全模板与默认示例。`.env` 不会提交到 Git。
-
----
-
-### 1）3 分钟安装（Linux / macOS）
+1. 克隆仓库并进入目录
+2. 运行预检脚本（检查 Python、虚拟环境、依赖状态）
+3. 安装依赖并启动 TUI
 
 ```bash
-git clone https://github.com/Pelican0126/openclaw-json-repair-kit.git
+git clone <your-private-repo-url>
 cd openclaw-json-repair-kit
+bash scripts/preflight.sh
 python3 -m venv .venv
 source .venv/bin/activate
-pip install -U pip
-pip install -r requirements.txt
+python -m pip install -U pip
+python -m pip install -r requirements.txt
+cp .env.example .env
+python -m kit tui
 ```
 
-### 2）Windows 安装（PowerShell）
+提示：如果你只想先体验本地 JSON 扫描/修复，`.env` 可先保留模板值；只有 AI 模式和 API 测试需要你填真实 key。
+
+## Windows / macOS / Linux
+
+Windows (PowerShell):
 
 ```powershell
-git clone https://github.com/Pelican0126/openclaw-json-repair-kit.git
+git clone <your-private-repo-url>
 cd openclaw-json-repair-kit
+powershell -ExecutionPolicy Bypass -File .\scripts\preflight.ps1
 py -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install -U pip
-pip install -r requirements.txt
-```
-
-如果报执行策略错误：
-```powershell
-Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
-```
-
----
-
-### 3）直接启动交互菜单（推荐）
-
-```bash
+python -m pip install -r requirements.txt
+Copy-Item .env.example .env
 python -m kit tui
 ```
 
-启动后会让你做两件事：
-1. 选择语言（输入 `en` 或 `zh`，直接回车默认中文）
-2. 输入"JSON 扫描路径"
-
----
-
-### 4）扫描路径怎么填（最重要！）
-
-**填"存放 JSON 文件的目录"，不是单个文件！**
-
-#### 常见扫描路径示例：
-
-| 场景 | 路径示例 |
-|------|----------|
-| 本地项目 | `/home/ubuntu/myapp/config` |
-| Windows | `C:\Users\you\project\config` |
-| 相对路径 | `./config` 或 `../service-a/config` |
-| 直接回车 | 默认当前目录 |
-
-#### 腾讯云 VPS 默认路径示例：
-
-| 服务 | 路径示例 |
-|------|----------|
-| Nginx 配置 | `/etc/nginx/conf.d/` |
-| 网站根目录 | `/var/www/html/` |
-| 应用配置 | `/home/ubuntu/myapp/config/` |
-| Docker 配置 | `/opt/docker/` |
-
-#### 阿里云 VPS 默认路径示例：
-
-| 服务 | 路径示例 |
-|------|----------|
-| Nginx 配置 | `/etc/nginx/conf.d/` |
-| 网站根目录 | `/var/www/html/` |
-| 应用配置 | `/root/myapp/config/` |
-| Docker 配置 | `/opt/docker/` |
-
-如果你填错了（路径不存在/不是目录），程序会自动回退到当前目录并提示你。
-
----
-
-### 5）菜单每个选项干什么
-
-- `1` 扫描 JSON：先查问题
-- `2` 生成模板：快速生成 JSON 模板
-- `3` 修复 JSON（应用+备份）：选择文件后自动修复，并先备份
-- `4` 回滚最近备份：不满意就撤销
-- `5` 校验 API 环境变量：检查 `.env` 填写是否完整
-- `6` AI 修复模式：使用 AI 循环尝试修复（需要 API）
-- `7` 全量检查：一键跑完整链路（pytest + scan + fix + rollback + api）
-- `8` 交互式写入 .env：向导填写 API 配置（推荐）
-- `9` API 连通性测试：测 DNS/TLS/HTTP
-
----
-
-### 6）CLI 模式用法
-
-除了交互式菜单，还支持命令行模式：
+macOS / Linux:
 
 ```bash
-# 扫描 JSON 文件
-python -m kit scan
-
-# 修复 JSON（仅扫描，不应用）
-python -m kit fix
-
-# 修复并应用（推荐）
-python -m kit fix --apply --backup
-
-# 使用 AI 修复模式（需要 API）
-python -m kit fix --apply --backup --ai
-
-# 回滚到上一版本
-python -m kit rollback --latest
-
-# API 相关
-python -m kit api validate
-python -m kit api test
-python -m kit api wizard
-```
-
----
-
-### 7）AI 修复模式说明
-
-AI 修复模式使用大语言模型循环尝试修复 JSON：
-- 最多循环 5 轮（可配置）
-- 每轮尝试解析，如果成功就停止
-- 如果所有轮次都失败，报告错误
-
-使用方式：
-- TUI：选择菜单选项 `6`
-- CLI：`python -m kit fix --apply --backup --ai`
-
-**注意**：AI 模式需要在 `.env` 中配置 API Key，可使用 `python -m kit api wizard` 配置。
-
----
-
-### 8）小白推荐流程（按这个来）
-
-1. `python -m kit tui`
-2. 选语言 + 填扫描目录
-3. 先跑 `1`（扫描）查看有哪些问题
-4. 再跑 `3`（修复+备份），按提示选择要修复的文件
-5. 如果结果不满意，跑 `4`（回滚）
-6. 要用 AI 模式时，先跑 `8`（写 `.env`），再跑 `6`
-7. 跑 `9` 测试 API 是否可用
-
----
-
-### 9）安全提醒
-
-- `.env` 不会提交到 Git（已在 `.gitignore`）
-- 不要把 key 发到群里/工单里
-- 交互式 `.env` 向导输入 key 时不会明文回显
-
----
-
-## English
-
-A beginner-friendly toolkit to:
-- ✅ Scan JSON errors
-- ✅ Fix JSON with backup
-- ✅ Rollback safely
-- ✅ AI repair mode (loops until parse passes or max rounds)
-- ✅ Fill `.env` interactively
-- ✅ Test API connectivity
-
-> ✅ No private API key or private base URL is stored in this repo. `.env` is gitignored.
-
-### Quick Start
-
-```bash
-git clone https://github.com/Pelican0126/openclaw-json-repair-kit.git
+git clone <your-private-repo-url>
 cd openclaw-json-repair-kit
+bash scripts/preflight.sh
 python3 -m venv .venv
 source .venv/bin/activate
-pip install -U pip
-pip install -r requirements.txt
+python -m pip install -U pip
+python -m pip install -r requirements.txt
+cp .env.example .env
 python -m kit tui
 ```
 
-### What to input for scan path?
-
-Input a **directory containing JSON files** (not a single file):
-
-| Scenario | Path Example |
-|----------|--------------|
-| Local project | `/home/ubuntu/myapp/config` |
-| Windows | `C:\Users\you\project\config` |
-| Relative | `./config`, `../service-a/config` |
-| Press Enter | Current directory |
-
-#### Tencent Cloud VPS Default Paths:
-
-| Service | Path Example |
-|---------|--------------|
-| Nginx config | `/etc/nginx/conf.d/` |
-| Web root | `/var/www/html/` |
-| App config | `/home/ubuntu/myapp/config/` |
-| Docker config | `/opt/docker/` |
-
-#### Alibaba Cloud VPS Default Paths:
-
-| Service | Path Example |
-|---------|--------------|
-| Nginx config | `/etc/nginx/conf.d/` |
-| Web root | `/var/www/html/` |
-| App config | `/root/myapp/config/` |
-| Docker config | `/opt/docker/` |
-
-### CLI Usage
+常用命令：
 
 ```bash
-# Scan JSON files
 python -m kit scan
-
-# Fix JSON (scan only, no apply)
-python -m kit fix
-
-# Fix and apply (recommended)
 python -m kit fix --apply --backup
-
-# AI repair mode (requires API)
-python -m kit fix --apply --backup --ai
-
-# Rollback
 python -m kit rollback --latest
-
-# API commands
 python -m kit api validate
 python -m kit api test
 python -m kit api wizard
 ```
 
-### AI Repair Mode
+## 常见问题
 
-AI repair mode uses LLMs to iteratively fix JSON:
-- Up to 5 rounds (configurable)
-- Stops if parse succeeds
-- Reports error if all rounds fail
+Q1: 扫描路径填什么？
+- 填目录，不是单个文件。例如 `./config`、`/etc/myapp`、`C:\Users\you\project\config`。
 
-Usage:
-- TUI: Select menu option `6`
-- CLI: `python -m kit fix --apply --backup --ai`
+Q2: 执行 `python -m kit ...` 报 `ModuleNotFoundError`？
+- 通常是没激活虚拟环境或没安装依赖。先激活 `.venv`，再执行 `python -m pip install -r requirements.txt`。
 
-**Note**: AI mode requires API Key in `.env`. Run `python -m kit api wizard` to configure.
+Q3: Windows 提示脚本执行策略受限？
+- 先执行 `Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass`，然后再运行脚本。
 
-### Recommended Flow
+Q4: AI 修复为什么失败？
+- 请先执行 `python -m kit api wizard` 填写 `.env`，再执行 `python -m kit api validate` 和 `python -m kit api test`。
 
-1. Run `python -m kit tui`
-2. Select language + scan directory
-3. Run `1` (scan) to see issues
-4. Run `3` (fix + backup), select files to fix
-5. If needed, run `4` (rollback)
-6. For AI mode: run `8` (env wizard) first, then `6`
-7. Run `9` to test API connectivity
+## 卸载 / 清理
+
+仅删除本地环境与缓存，不影响你的源码：
+
+- 删除虚拟环境：`.venv/`
+- 删除缓存：`__pycache__/`、`.pytest_cache/`
+- 删除运行输出：`reports/`、`logs/`、`build/`、`dist/`
+- 删除本地敏感配置：`.env`
+
+示例（macOS / Linux）：
+
+```bash
+rm -rf .venv __pycache__ .pytest_cache reports logs build dist .env
+```
+
+## 隐私与安全
+
+- 仓库中只保留 `.env.example`，不提交真实密钥
+- `.env`、证书、私钥等敏感文件已在 `.gitignore` 中忽略
+- 不要在 Issue、截图、日志中暴露 token/key/base_url
+- 发现漏洞请查看 `SECURITY.md` 的上报流程
+
+## 贡献指南
+
+欢迎提交 PR，建议流程：
+
+1. 新建分支：`git checkout -b feat/your-change`
+2. 本地安装依赖并运行测试：`python -m pytest -q`
+3. 更新相关文档（如 README/脚本说明）
+4. 提交 PR，说明改动动机、影响范围、验证方式
+
+请避免提交以下内容：真实密钥、生产配置、无关大文件、格式化噪音改动。
