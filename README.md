@@ -30,8 +30,8 @@ cd opencode-remote && ./start.sh
 - `/use <项目名>`
 - 删除项目：`/menu -> Projects -> Delete Project`
 
-## 发布前安全检查
 
-```bash
-./scripts/check-secrets.sh
-```
+## 要饭环节
+![ea18aaca70b30a8b4a9dcd31b9cae8a3](https://github.com/user-attachments/assets/621a96a2-b4c7-4863-afd9-0ebcb32e49a3)
+![e0ca54607ef0e7172112bab33f42177d](https://github.com/user-attachments/assets/4ac53365-811f-401e-949a-a7d2d8a0733c)
+
