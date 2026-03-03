@@ -1,0 +1,10 @@
+.env
+.env.*
+!.env.example
+sandbox/
+workspace/
+data/
+bot.log
+rust-bot/target/
+.opencode-runtime/
+release/
